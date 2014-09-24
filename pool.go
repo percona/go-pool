@@ -17,65 +17,20 @@
 
 package pool
 
-// Inspired by http://openmymind.net/Introduction-To-Go-Channels/ and
-// the built-in sync.Pool.
-
 import (
 	"errors"
 	"time"
 )
 
 var (
-	ErrTimeout  = errors.New("Timeout")
-	ErrOverflow = errors.New("Overflow")
+	ErrTimeout   = errors.New("Timeout")
+	ErrOverflow  = errors.New("Overflow")
+	ErrUnderflow = errors.New("Underflow")
 )
 
-type Pool struct {
-	size    uint
-	pool    chan interface{}
-	newFunc func() interface{}
-	putFunc func(interface{})
-}
-
-func NewPool(size uint, newFunc func() interface{}, putFunc func(interface{})) *Pool {
-	pool := make(chan interface{}, int(size))
-	for i := 0; i < int(size); i++ {
-		pool <- nil
-	}
-	p := &Pool{
-		size:    size,
-		pool:    pool,
-		newFunc: newFunc,
-		putFunc: putFunc,
-	}
-	return p
-}
-
-func (p *Pool) Free() uint {
-	return uint(len(p.pool))
-}
-
-func (p *Pool) Get(timeout time.Duration) (interface{}, error) {
-	var d interface{}
-	select {
-	case d = <-p.pool:
-		if d == nil && p.newFunc != nil {
-			d = p.newFunc()
-		}
-		return d, nil
-	case <-time.After(timeout):
-		return nil, ErrTimeout
-	}
-}
-
-func (p *Pool) Put(v interface{}) error {
-	if p.putFunc != nil {
-		p.putFunc(v)
-	}
-	select {
-	case p.pool <- v:
-		return nil
-	default:
-		return ErrOverflow
-	}
+type Pool interface {
+	Size() uint
+	Free() uint
+	Get(timeout time.Duration) (interface{}, error)
+	Put(v interface{})
 }
