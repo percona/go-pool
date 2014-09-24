@@ -32,5 +32,5 @@ type Pool interface {
 	Size() uint
 	Free() uint
 	Get(timeout time.Duration) (interface{}, error)
-	Put(v interface{})
+	Put(v interface{}) error
 }
