@@ -23,14 +23,14 @@ import (
 
 type StaticPool struct {
 	size    uint
-	newFunc func() interface{}
+	newFunc func() (interface{}, error)
 	putFunc func(interface{})
 	// --
 	pool  chan interface{}
 	alloc uint
 }
 
-func NewStaticPool(size uint, newFunc func() interface{}, putFunc func(interface{})) *StaticPool {
+func NewStaticPool(size uint, newFunc func() (interface{}, error), putFunc func(interface{})) *StaticPool {
 	pool := make(chan interface{}, int(size))
 	for i := 0; i < int(size); i++ {
 		pool <- nil
@@ -58,7 +58,11 @@ func (p *StaticPool) Get(timeout time.Duration) (interface{}, error) {
 	select {
 	case d = <-p.pool:
 		if d == nil && p.newFunc != nil {
-			d = p.newFunc()
+			var err error
+			d, err = p.newFunc()
+			if err != nil {
+				return nil, err
+			}
 		}
 		return d, nil
 	case <-time.After(timeout):

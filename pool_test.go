@@ -18,6 +18,7 @@
 package pool_test
 
 import (
+	"errors"
 	pool "github.com/percona/go-pool"
 	. "gopkg.in/check.v1"
 	"testing"
@@ -29,6 +30,8 @@ func Test(t *testing.T) { TestingT(t) }
 type D struct {
 	n int
 }
+
+var errFoo = errors.New("foo")
 
 type StaticTestSuite struct {
 }
@@ -66,10 +69,10 @@ func (s *StaticTestSuite) TestGetAndFree(t *C) {
 func (s *StaticTestSuite) TestFuncsAndPut(t *C) {
 	size := uint(2)
 	n := 0
-	newFunc := func() interface{} {
+	newFunc := func() (interface{}, error) {
 		n++
 		d := &D{n: n}
-		return d
+		return d, nil
 	}
 	put := []*D{}
 	putFunc := func(v interface{}) {
@@ -97,9 +100,9 @@ func (s *StaticTestSuite) TestOverflow(t *C) {
 func (s *StaticTestSuite) TestNewFunc(t *C) {
 	// newFunc should only be called once for new items.
 	called := 0
-	newFunc := func() interface{} {
+	newFunc := func() (interface{}, error) {
 		called++
-		return 1
+		return 1, nil
 	}
 	p := pool.NewStaticPool(2, newFunc, nil)
 	for i := 0; i < 5; i++ {
@@ -109,6 +112,16 @@ func (s *StaticTestSuite) TestNewFunc(t *C) {
 		t.Assert(err, IsNil)
 	}
 	t.Check(called, Equals, 2)
+}
+
+func (s *StaticTestSuite) TestNewFuncErr(t *C) {
+	newFunc := func() (interface{}, error) {
+		return nil, errFoo
+	}
+	p := pool.NewStaticPool(2, newFunc, nil)
+	d, err := p.Get(time.Duration(1 * time.Millisecond))
+	t.Check(err, Equals, errFoo)
+	t.Check(d, IsNil)
 }
 
 // --------------------------------------------------------------------------
@@ -149,10 +162,10 @@ func (s *DynamicTestSuite) TestGetAndFree(t *C) {
 func (s *DynamicTestSuite) TestFuncsAndPut(t *C) {
 	size := uint(2)
 	n := 0
-	newFunc := func() interface{} {
+	newFunc := func() (interface{}, error) {
 		n++
 		d := &D{n: n}
-		return d
+		return d, nil
 	}
 	put := []*D{}
 	putFunc := func(v interface{}) {
@@ -190,9 +203,9 @@ func (s *DynamicTestSuite) TestUnderflow(t *C) {
 func (s *DynamicTestSuite) TestNewFunc(t *C) {
 	// newFunc should only be called once for new items.
 	called := 0
-	newFunc := func() interface{} {
+	newFunc := func() (interface{}, error) {
 		called++
-		return 1
+		return 1, nil
 	}
 	p := pool.NewDynamicPool(2, newFunc, nil)
 	for i := 0; i < 5; i++ {
@@ -243,4 +256,14 @@ func (s *DynamicTestSuite) TestWaitFree(t *C) {
 
 	// It should have gotten the first/only free item.
 	t.Check(d.(*D).n, Equals, 101)
+}
+
+func (s *DynamicTestSuite) TestNewFuncErr(t *C) {
+	newFunc := func() (interface{}, error) {
+		return nil, errFoo
+	}
+	p := pool.NewDynamicPool(2, newFunc, nil)
+	d, err := p.Get(time.Duration(1 * time.Millisecond))
+	t.Check(err, Equals, errFoo)
+	t.Check(d, IsNil)
 }

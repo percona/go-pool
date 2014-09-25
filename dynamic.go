@@ -24,7 +24,7 @@ import (
 
 type DynamicPool struct {
 	size    uint
-	newFunc func() interface{}
+	newFunc func() (interface{}, error)
 	putFunc func(interface{})
 	// --
 	pool chan interface{}
@@ -32,7 +32,7 @@ type DynamicPool struct {
 	mux  *sync.Mutex // guards out
 }
 
-func NewDynamicPool(size uint, newFunc func() interface{}, putFunc func(interface{})) *DynamicPool {
+func NewDynamicPool(size uint, newFunc func() (interface{}, error), putFunc func(interface{})) *DynamicPool {
 	p := &DynamicPool{
 		size:    size,
 		newFunc: newFunc,
@@ -66,7 +66,11 @@ func (p *DynamicPool) Get(timeout time.Duration) (interface{}, error) {
 		return nil, err
 	}
 	if d == nil && p.newFunc != nil {
-		d = p.newFunc()
+		var err error
+		d, err = p.newFunc()
+		if err != nil {
+			return nil, err
+		}
 	}
 	p.mux.Lock()
 	defer p.mux.Unlock()
