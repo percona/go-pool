@@ -65,6 +65,9 @@ func (p *DynamicPool) Get(timeout time.Duration) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
+	// @todo Two(or more) goroutines can hit Free() == 1 which will lead them to create new connection
+	// When both will create connection we will have more p.out than p.size,
+	// which will lead to overflow uint so Free() == 4294967295 (or 18446744073709551615 on 64 bit systems)
 	if d == nil && p.newFunc != nil {
 		var err error
 		d, err = p.newFunc()
